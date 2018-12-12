@@ -6,12 +6,22 @@ package com.tzan.apm.model;
  */
 public class Metadata {
   private String type;
+  private String applicationName;
 
   public Metadata() {
   }
 
-  public Metadata(String type) {
+  public Metadata(String type, String applicationName) {
     this.type = type;
+    this.applicationName = applicationName;
+  }
+
+  public String getApplicationName() {
+    return applicationName;
+  }
+
+  public void setApplicationName(String applicationName) {
+    this.applicationName = applicationName;
   }
 
   public String getType() {

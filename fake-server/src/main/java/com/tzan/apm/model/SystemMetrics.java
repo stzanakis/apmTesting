@@ -6,7 +6,6 @@ package com.tzan.apm.model;
  */
 public class SystemMetrics {
 
-  private String applicationName;
   private String applicationId;
   private int instanceIndex;
   private double cpuPercentage;
@@ -16,14 +15,6 @@ public class SystemMetrics {
   private long diskBytesQuota;
 
   public SystemMetrics() {
-  }
-
-  public String getApplicationName() {
-    return applicationName;
-  }
-
-  public void setApplicationName(String applicationName) {
-    this.applicationName = applicationName;
   }
 
   public String getApplicationId() {

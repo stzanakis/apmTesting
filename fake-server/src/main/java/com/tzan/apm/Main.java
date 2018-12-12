@@ -5,6 +5,14 @@ import com.tzan.apm.utils.DataUtils;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.TimeUnit;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author Simon Tzanakis (Simon.Tzanakis@europeana.eu)
@@ -12,27 +20,37 @@ import java.io.InputStreamReader;
  */
 public class Main {
 
-  public static final String applicationName = "metis-authentication-rest-test";
+  private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
+
+//  public static final String APPLICATION_NAME = "metis-authentication-rest-test";
+  public static final List<String> applicationNames = new ArrayList<>(
+      Arrays.asList("metis-authentication-rest-test", "metis-core-rest-test"));
   private static final String APP_NOZZLE_COMMAND_TEMPLATE = "cf app-nozzle %s -filter ContainerMetric";
+  private static Map<String, Thread> runnablesMap = new HashMap<>();
+  private static final int SLEEP_TIME_PER_LOOP_IN_MINS = 1;
 
   public static void main(String[] arg) throws IOException, InterruptedException {
-    Runtime rt = Runtime.getRuntime();
-    final Process pr = rt.exec(String.format(APP_NOZZLE_COMMAND_TEMPLATE, applicationName));
-    new Thread(() -> {
-      BufferedReader input = new BufferedReader(new InputStreamReader(pr.getInputStream()));
-      String line;
 
-      try {
-        while ((line = input.readLine()) != null) {
-          final Metric metric = DataUtils.convertNozzleMetricsToMetricObject(line);
-          DataUtils.sendMetricToElasticSearch(metric);
+    do {
+      LOGGER.info("Start loop to check running threads");
+
+      //Read application names from file every minute
+      //Check which ones are not running and start them
+      for (String applicationName : applicationNames) {
+        final Thread thread = runnablesMap.get(applicationName);
+        if (thread == null || !thread.isAlive()) {
+          final Thread runnableThread = createRunnableThread(applicationName);
+          runnablesMap.put(applicationName, runnableThread);
+          runnableThread.start();
+          LOGGER.info("Started thread for applicationName: {}.", applicationName);
+        } else {
+          LOGGER.info("Thread for {}, is alive.", applicationName);
         }
-      } catch (IOException e) {
-        e.printStackTrace();
       }
-    }).start();
 
-    pr.waitFor();
+      LOGGER.info("Sleeping for {} before re-checking map of threads.", SLEEP_TIME_PER_LOOP_IN_MINS);
+      Thread.sleep(TimeUnit.MINUTES.toMillis(SLEEP_TIME_PER_LOOP_IN_MINS));
+    } while (true);
 
 //    final Metric metric = convertNozzleMetricsToMetricObject();
 //    final Metric metric = convertNozzleMetricsToMetricObject(
@@ -43,6 +61,24 @@ public class Main {
 //    ObjectMapper mapper = new ObjectMapper();
 //    System.out.println(mapper.defaultPrettyPrintingWriter().writeValueAsString(jsonString));
 //    System.out.println(mapper.writeValueAsString(metric));
+  }
+
+  private static Thread createRunnableThread(String applicationName) throws IOException {
+    Runtime rt = Runtime.getRuntime();
+    final Process process = rt.exec(String.format(APP_NOZZLE_COMMAND_TEMPLATE, applicationName));
+    return new Thread(() -> {
+      BufferedReader input = new BufferedReader(new InputStreamReader(process.getInputStream()));
+      String line;
+
+      try {
+        while ((line = input.readLine()) != null) {
+          final Metric metric = DataUtils.convertNozzleMetricsToMetricObject(applicationName, line);
+          DataUtils.sendMetricToElasticSearch(metric);
+        }
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    });
   }
 
 }

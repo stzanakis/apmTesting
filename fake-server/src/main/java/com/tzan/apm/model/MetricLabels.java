@@ -12,7 +12,7 @@ public enum MetricLabels {
   TIMESTAMP("timestamp", (metric, value) -> metric
       .setTimestamp(new Date(TimeUnit.NANOSECONDS.toMillis(Long.parseLong(value))))),
   APPLICATION_NAME("applicationName",
-      (metric, value) -> metric.getSystem().setApplicationName(value)),
+      (metric, value) -> metric.getMetadata().setApplicationName(value)),
   APPLICATION_ID("applicationId",
       (metric, value) -> metric.getSystem().setApplicationId(value.replace("\"", ""))),
   INSTANCE_INDEX("instanceIndex",
