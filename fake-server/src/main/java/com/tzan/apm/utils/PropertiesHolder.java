@@ -17,10 +17,16 @@ public class PropertiesHolder {
   private static final String CONFIGURATION_FILE = "configuration.properties";
   private static final Properties properties = new Properties();
   public static final String APP_NOZZLE_COMMAND_TEMPLATE = "cf app-nozzle %s -filter ContainerMetric";
+  public static final String CF_LOGIN_COMMAND_TEMPLATE = "cf login -a %s -u %s -p %s -o %s -s %s";
   public static final int SLEEP_TIME_PER_LOOP_IN_MINS = 1;
 
   private String elasticsearchIndexUrl;
   private String cfApplicationNamesFilePath;
+  private String cfApiEndpoint;
+  private String cfUsername;
+  private String cfPassword;
+  private String cfOrganization;
+  private String cfTargetSpace;
 
   public PropertiesHolder() {
     InputStream input = null;
@@ -46,6 +52,11 @@ public class PropertiesHolder {
   private void initializeProperties() {
     elasticsearchIndexUrl = (String) properties.get("elasticsearch.index.url");
     cfApplicationNamesFilePath = (String) properties.get("application.names.file");
+    cfApiEndpoint = (String) properties.get("cf.api.endpoint");
+    cfUsername = (String) properties.get("cf.username");
+    cfPassword = (String) properties.get("cf.password");
+    cfOrganization = (String) properties.get("cf.organization");
+    cfTargetSpace = (String) properties.get("cf.target.space");
   }
 
   public String getElasticsearchIndexUrl() {
@@ -54,5 +65,25 @@ public class PropertiesHolder {
 
   public String getCfApplicationNamesFilePath() {
     return cfApplicationNamesFilePath;
+  }
+
+  public String getCfApiEndpoint() {
+    return cfApiEndpoint;
+  }
+
+  public String getCfUsername() {
+    return cfUsername;
+  }
+
+  public String getCfPassword() {
+    return cfPassword;
+  }
+
+  public String getCfOrganization() {
+    return cfOrganization;
+  }
+
+  public String getCfTargetSpace() {
+    return cfTargetSpace;
   }
 }

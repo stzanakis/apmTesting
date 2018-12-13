@@ -1,7 +1,9 @@
 package com.tzan.apm;
 
 import com.tzan.apm.utils.PropertiesHolder;
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -26,8 +28,9 @@ public class Main {
   private static Map<String, Thread> runnablesMap = new HashMap<>();
   private static final PropertiesHolder PROPERTIES_HOLDER = new PropertiesHolder();
 
-  public static void main(String[] arg) throws InterruptedException {
+  public static void main(String[] arg) throws InterruptedException, IOException {
 
+    loginToCf();
     List<String> previousLoopCfApplicationNames = new ArrayList<>();
     List<String> cfApplicationNames;
     do {
@@ -42,6 +45,32 @@ public class Main {
           PropertiesHolder.SLEEP_TIME_PER_LOOP_IN_MINS);
       Thread.sleep(TimeUnit.MINUTES.toMillis(PropertiesHolder.SLEEP_TIME_PER_LOOP_IN_MINS));
     } while (true);
+  }
+
+  private static void loginToCf() throws IOException {
+    LOGGER.info("Connecting to cf at organization {} and space {}",
+        PROPERTIES_HOLDER.getCfOrganization(), PROPERTIES_HOLDER.getCfTargetSpace());
+    Runtime rt = Runtime.getRuntime();
+    try {
+      Process process = rt.exec(String.format(PropertiesHolder.CF_LOGIN_COMMAND_TEMPLATE,
+          PROPERTIES_HOLDER.getCfApiEndpoint(), PROPERTIES_HOLDER.getCfUsername(),
+          PROPERTIES_HOLDER.getCfPassword(), PROPERTIES_HOLDER.getCfOrganization(),
+          PROPERTIES_HOLDER.getCfTargetSpace()));
+      try (BufferedReader input = new BufferedReader(
+          new InputStreamReader(process.getInputStream()))) {
+        String line;
+        while ((line = input.readLine()) != null) {
+          LOGGER.info(line);
+          if (line.contains("Credentials were rejected") || line.contains("FAILED")) {
+            throw new IllegalArgumentException(String.format("Failed to connect to space %s",
+                PROPERTIES_HOLDER.getCfTargetSpace()));
+          }
+        }
+      }
+    } catch (IOException e) {
+      LOGGER.error("Execution of target space connection failed", e);
+      throw e;
+    }
   }
 
   private static void checkAndStartThreadRequested(List<String> cfApplicationNames) {

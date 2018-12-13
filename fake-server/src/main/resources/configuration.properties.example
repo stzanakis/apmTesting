@@ -2,3 +2,10 @@
 elasticsearch.index.url=
 #Contains cloud foundry file names, one per line
 application.names.file=
+#The space to use in cloud foundry
+target.space=
+cf.api.endpoint=
+cf.username=
+cf.password=
+cf.organization=
+cf.target.space=
