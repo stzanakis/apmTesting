@@ -15,6 +15,7 @@ public class SystemMetrics {
   private long diskBytesQuota;
 
   public SystemMetrics() {
+    //Json serialization
   }
 
   public String getApplicationId() {

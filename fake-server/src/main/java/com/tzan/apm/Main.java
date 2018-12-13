@@ -1,14 +1,21 @@
 package com.tzan.apm;
 
 import com.tzan.apm.model.Metric;
-import com.tzan.apm.utils.PropertiesHolder;
 import com.tzan.apm.utils.DataUtils;
+import com.tzan.apm.utils.PropertiesHolder;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.logging.log4j.util.Strings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,14 +30,17 @@ public class Main {
   private static Map<String, Thread> runnablesMap = new HashMap<>();
   private static final PropertiesHolder PROPERTIES_HOLDER = new PropertiesHolder();
 
-  public static void main(String[] arg) throws IOException, InterruptedException {
+  public static void main(String[] arg) throws InterruptedException {
 
+    List<String> previousLoopCfApplicationNames = new ArrayList<>();
+    List<String> cfApplicationNames;
     do {
       LOGGER.info("Start loop to check running threads");
+      cfApplicationNames = getCfApplicationNamesFromFile();
+      LOGGER.info("Got {} cfApplicationNames from file:", cfApplicationNames.size());
 
-      //Read application names from file every minute
       //Check which ones are not running and start them
-      for (String applicationName : PropertiesHolder.applicationNames) {
+      for (String applicationName : cfApplicationNames) {
         final Thread thread = runnablesMap.get(applicationName);
         if (thread == null || !thread.isAlive()) {
           final Thread runnableThread = createRunnableThread(applicationName);
@@ -42,40 +52,71 @@ public class Main {
         }
       }
 
-      LOGGER
-          .info("Sleeping for {} before re-checking map of threads.",
-              PropertiesHolder.SLEEP_TIME_PER_LOOP_IN_MINS);
+      //Stop the ones that do not exist in the file anymore
+      List<String> cfApplicationNamesToStop = new ArrayList<>(previousLoopCfApplicationNames);
+      cfApplicationNamesToStop.removeAll(cfApplicationNames);
+      for (String applicationName : cfApplicationNamesToStop) {
+        final Thread thread = runnablesMap.get(applicationName);
+        LOGGER.info("Interrupting thread responsible for {}. Is not in the applicationNames list",
+            applicationName);
+        thread.interrupt();
+      }
+
+      previousLoopCfApplicationNames = cfApplicationNames;
+      LOGGER.info("Sleeping for {} minute before re-checking map of threads.",
+          PropertiesHolder.SLEEP_TIME_PER_LOOP_IN_MINS);
       Thread.sleep(TimeUnit.MINUTES.toMillis(PropertiesHolder.SLEEP_TIME_PER_LOOP_IN_MINS));
     } while (true);
-
-//    final Metric metric = convertNozzleMetricsToMetricObject();
-//    final Metric metric = convertNozzleMetricsToMetricObject(
-//        "origin:\"rep\" eventType:ContainerMetric timestamp:1544541476899162066 deployment:\"eu-de-worker2-fra04\" job:\"diego-cell\" index:\"1ead2503-2c8d-459d-8b2d-006956a73182\" ip:\"161.156.69.23\" tags:<key:\"source_id\" value:\"bf50f43e-3068-4aed-ac8d-c3e109fa3fca\" > containerMetric:<applicationId:\"bf50f43e-3068-4aed-ac8d-c3e109fa3fca\" instanceIndex:1 cpuPercentage:1.5901474090814591 memoryBytes:724201472 diskBytes:179109888 memoryBytesQuota:2147483648 diskBytesQuota:1073741824 >  ");
-//    ObjectMapper mapper = new ObjectMapper();
-//    System.out.println(mapper.writeValueAsString(metric));
-//    sendMetricToElasticSearch(metric);
-//    ObjectMapper mapper = new ObjectMapper();
-//    System.out.println(mapper.defaultPrettyPrintingWriter().writeValueAsString(jsonString));
-//    System.out.println(mapper.writeValueAsString(metric));
   }
 
-  private static Thread createRunnableThread(String applicationName) throws IOException {
-    Runtime rt = Runtime.getRuntime();
-    final Process process = rt
-        .exec(String.format(PropertiesHolder.APP_NOZZLE_COMMAND_TEMPLATE, applicationName));
-    return new Thread(() -> {
-      BufferedReader input = new BufferedReader(new InputStreamReader(process.getInputStream()));
-      String line;
+  private static List<String> getCfApplicationNamesFromFile() {
+    try (Stream<String> stream = Files
+        .lines(Paths.get(PROPERTIES_HOLDER.getCfApplicationNamesFilePath()))) {
+      return stream.filter(Strings::isNotBlank).collect(Collectors.toList());
+    } catch (IOException e) {
+      LOGGER.error(String.format("Could not read lines of file %s",
+          PROPERTIES_HOLDER.getCfApplicationNamesFilePath()), e);
+    }
+    return new ArrayList<>();
+  }
 
+  private static Thread createRunnableThread(String applicationName) {
+    return new Thread(() -> {
+      Runtime rt = Runtime.getRuntime();
+      final Process process;
       try {
-        while ((line = input.readLine()) != null) {
-          final Metric metric = DataUtils.convertNozzleMetricsToMetricObject(applicationName, line);
-          DataUtils.sendMetricToElasticSearch(PROPERTIES_HOLDER.getElasticsearchIndexUrl(), metric);
-        }
+        process = rt
+            .exec(String.format(PropertiesHolder.APP_NOZZLE_COMMAND_TEMPLATE, applicationName));
+        commandOutputInfiniteReader(applicationName, process);
       } catch (IOException e) {
-        e.printStackTrace();
+        LOGGER.error(String
+            .format(
+                "Execution of Firehose nozzle command %s failed or command output could not be read",
+                applicationName), e);
       }
+      LOGGER
+          .info(
+              "Thread responsible for {}, exiting because it was interrupted or an exception occurred!",
+              applicationName);
     });
+  }
+
+  private static void commandOutputInfiniteReader(String applicationName, Process process)
+      throws IOException {
+    try (BufferedReader input = new BufferedReader(
+        new InputStreamReader(process.getInputStream()))) {
+      String line;
+      while ((line = input.readLine()) != null) {
+        final Metric metric = DataUtils
+            .convertNozzleMetricsToMetricObject(applicationName, line);
+        DataUtils
+            .sendMetricToElasticSearch(PROPERTIES_HOLDER.getElasticsearchIndexUrl(), metric);
+        //Exit loop if thread was interrupted
+        if (Thread.interrupted()) {
+          break;
+        }
+      }
+    }
   }
 
 }

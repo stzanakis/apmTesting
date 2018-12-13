@@ -15,9 +15,12 @@ import org.springframework.web.client.RestTemplate;
  * @author Simon Tzanakis (Simon.Tzanakis@europeana.eu)
  * @since 2018-12-12
  */
-public class DataUtils {
+public final class DataUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DataUtils.class);
+
+  private DataUtils() {
+  }
 
   public static void sendMetricToElasticSearch(String elasticsearchIndexUrl, Metric metric) {
     if (metric != null) {
@@ -37,7 +40,7 @@ public class DataUtils {
       final String metricStartingFromTimestamp = nozzleMetricLine
           .substring(nozzleMetricLine.indexOf("timestamp:") + "timestamp:".length());
       final String timestampValue = metricStartingFromTimestamp
-          .substring(0, metricStartingFromTimestamp.indexOf(" "));
+          .substring(0, metricStartingFromTimestamp.indexOf(' '));
       final String metrics = nozzleMetricLine.split("containerMetric:<")[1];
       final String[] metricsArray = metrics.split(" ");
 

@@ -1,1 +1,4 @@
+#The elasticsearch endpoint of the metrics index
 elasticsearch.index.url=
+#Contains cloud foundry file names, one per line
+application.names.file=
