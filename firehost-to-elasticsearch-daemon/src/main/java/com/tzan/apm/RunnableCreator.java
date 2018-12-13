@@ -52,6 +52,7 @@ public class RunnableCreator implements Function<String, Runnable> {
         new InputStreamReader(process.getInputStream()))) {
       String line;
       while ((line = input.readLine()) != null) {
+        LOGGER.debug("Command response by line: {}", line);
         final Metric metric = DataUtils
             .convertNozzleMetricsToMetricObject(applicationName, line);
         DataUtils

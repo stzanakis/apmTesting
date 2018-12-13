@@ -27,6 +27,7 @@ public class PropertiesHolder {
   private String cfPassword;
   private String cfOrganization;
   private String cfTargetSpace;
+  private long cfLoginIntervalInMins;
 
   public PropertiesHolder() {
     InputStream input = null;
@@ -57,6 +58,7 @@ public class PropertiesHolder {
     cfPassword = (String) properties.get("cf.password");
     cfOrganization = (String) properties.get("cf.organization");
     cfTargetSpace = (String) properties.get("cf.target.space");
+    cfLoginIntervalInMins = Long.parseLong((String) properties.get("cf.log.interval.in.mins"));
   }
 
   public String getElasticsearchIndexUrl() {
@@ -85,5 +87,9 @@ public class PropertiesHolder {
 
   public String getCfTargetSpace() {
     return cfTargetSpace;
+  }
+
+  public long getCfLoginIntervalInMins() {
+    return cfLoginIntervalInMins;
   }
 }

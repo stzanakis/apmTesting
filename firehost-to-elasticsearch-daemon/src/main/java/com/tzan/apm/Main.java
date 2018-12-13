@@ -29,11 +29,22 @@ public class Main {
   private static final PropertiesHolder PROPERTIES_HOLDER = new PropertiesHolder();
 
   public static void main(String[] arg) throws InterruptedException, IOException {
-
     loginToCf();
     List<String> previousLoopCfApplicationNames = new ArrayList<>();
     List<String> cfApplicationNames;
+
+    long startTime = System.nanoTime();
     do {
+      long endTime = System.nanoTime();
+      long elapsedTime = endTime - startTime; // time in nanoseconds
+      //We do a login after a specific period has passed, just in case
+      if (TimeUnit.NANOSECONDS.toMinutes(elapsedTime) >= PROPERTIES_HOLDER
+          .getCfLoginIntervalInMins()) {
+        loginToCfuninterruptedly();
+        endTime = System.nanoTime();
+        startTime = endTime;
+      }
+
       LOGGER.info("Start loop to check running threads");
       cfApplicationNames = getCfApplicationNamesFromFile();
       LOGGER.info("Got {} cfApplicationNames from file:", cfApplicationNames.size());
@@ -70,6 +81,30 @@ public class Main {
     } catch (IOException e) {
       LOGGER.error("Execution of target space connection failed", e);
       throw e;
+    }
+  }
+
+  private static void loginToCfuninterruptedly() {
+    LOGGER.info("Connecting to cf at organization {} and space {}",
+        PROPERTIES_HOLDER.getCfOrganization(), PROPERTIES_HOLDER.getCfTargetSpace());
+    Runtime rt = Runtime.getRuntime();
+    try {
+      Process process = rt.exec(String.format(PropertiesHolder.CF_LOGIN_COMMAND_TEMPLATE,
+          PROPERTIES_HOLDER.getCfApiEndpoint(), PROPERTIES_HOLDER.getCfUsername(),
+          PROPERTIES_HOLDER.getCfPassword(), PROPERTIES_HOLDER.getCfOrganization(),
+          PROPERTIES_HOLDER.getCfTargetSpace()));
+      try (BufferedReader input = new BufferedReader(
+          new InputStreamReader(process.getInputStream()))) {
+        String line;
+        while ((line = input.readLine()) != null) {
+          LOGGER.info(line);
+          if (line.contains("Credentials were rejected") || line.contains("FAILED")) {
+            LOGGER.error("Failed to connect to space {}", PROPERTIES_HOLDER.getCfTargetSpace());
+          }
+        }
+      }
+    } catch (IOException e) {
+      LOGGER.error("Execution of target space connection failed", e);
     }
   }
 
