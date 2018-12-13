@@ -1,11 +1,7 @@
 package com.tzan.apm;
 
-import com.tzan.apm.model.Metric;
-import com.tzan.apm.utils.DataUtils;
 import com.tzan.apm.utils.PropertiesHolder;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -38,35 +34,44 @@ public class Main {
       LOGGER.info("Start loop to check running threads");
       cfApplicationNames = getCfApplicationNamesFromFile();
       LOGGER.info("Got {} cfApplicationNames from file:", cfApplicationNames.size());
-
-      //Check which ones are not running and start them
-      for (String applicationName : cfApplicationNames) {
-        final Thread thread = runnablesMap.get(applicationName);
-        if (thread == null || !thread.isAlive()) {
-          final Thread runnableThread = createRunnableThread(applicationName);
-          runnablesMap.put(applicationName, runnableThread);
-          runnableThread.start();
-          LOGGER.info("Started thread for applicationName: {}.", applicationName);
-        } else {
-          LOGGER.info("Thread for {}, is alive.", applicationName);
-        }
-      }
-
-      //Stop the ones that do not exist in the file anymore
-      List<String> cfApplicationNamesToStop = new ArrayList<>(previousLoopCfApplicationNames);
-      cfApplicationNamesToStop.removeAll(cfApplicationNames);
-      for (String applicationName : cfApplicationNamesToStop) {
-        final Thread thread = runnablesMap.get(applicationName);
-        LOGGER.info("Interrupting thread responsible for {}. Is not in the applicationNames list",
-            applicationName);
-        thread.interrupt();
-      }
+      checkAndStartThreadRequested(cfApplicationNames);
+      stopThreadsNotInList(previousLoopCfApplicationNames, cfApplicationNames);
 
       previousLoopCfApplicationNames = cfApplicationNames;
       LOGGER.info("Sleeping for {} minute before re-checking map of threads.",
           PropertiesHolder.SLEEP_TIME_PER_LOOP_IN_MINS);
       Thread.sleep(TimeUnit.MINUTES.toMillis(PropertiesHolder.SLEEP_TIME_PER_LOOP_IN_MINS));
     } while (true);
+  }
+
+  private static void checkAndStartThreadRequested(List<String> cfApplicationNames) {
+    //Check which ones are not running and start them
+    for (String applicationName : cfApplicationNames) {
+      final Thread thread = runnablesMap.get(applicationName);
+      if (thread == null || !thread.isAlive()) {
+        final Thread runnableThread = new Thread(
+            new RunnableCreator(PROPERTIES_HOLDER.getElasticsearchIndexUrl())
+                .apply(applicationName));
+        runnablesMap.put(applicationName, runnableThread);
+        runnableThread.start();
+        LOGGER.info("Started thread for applicationName: {}.", applicationName);
+      } else {
+        LOGGER.info("Thread for {}, is alive.", applicationName);
+      }
+    }
+  }
+
+  private static void stopThreadsNotInList(List<String> previousLoopCfApplicationNames,
+      List<String> cfApplicationNames) {
+    //Stop the ones that do not exist in the file anymore
+    List<String> cfApplicationNamesToStop = new ArrayList<>(previousLoopCfApplicationNames);
+    cfApplicationNamesToStop.removeAll(cfApplicationNames);
+    for (String applicationName : cfApplicationNamesToStop) {
+      final Thread thread = runnablesMap.get(applicationName);
+      LOGGER.info("Interrupting thread responsible for {}. Is not in the applicationNames list",
+          applicationName);
+      thread.interrupt();
+    }
   }
 
   private static List<String> getCfApplicationNamesFromFile() {
@@ -78,45 +83,6 @@ public class Main {
           PROPERTIES_HOLDER.getCfApplicationNamesFilePath()), e);
     }
     return new ArrayList<>();
-  }
-
-  private static Thread createRunnableThread(String applicationName) {
-    return new Thread(() -> {
-      Runtime rt = Runtime.getRuntime();
-      final Process process;
-      try {
-        process = rt
-            .exec(String.format(PropertiesHolder.APP_NOZZLE_COMMAND_TEMPLATE, applicationName));
-        commandOutputInfiniteReader(applicationName, process);
-      } catch (IOException e) {
-        LOGGER.error(String
-            .format(
-                "Execution of Firehose nozzle command %s failed or command output could not be read",
-                applicationName), e);
-      }
-      LOGGER
-          .info(
-              "Thread responsible for {}, exiting because it was interrupted or an exception occurred!",
-              applicationName);
-    });
-  }
-
-  private static void commandOutputInfiniteReader(String applicationName, Process process)
-      throws IOException {
-    try (BufferedReader input = new BufferedReader(
-        new InputStreamReader(process.getInputStream()))) {
-      String line;
-      while ((line = input.readLine()) != null) {
-        final Metric metric = DataUtils
-            .convertNozzleMetricsToMetricObject(applicationName, line);
-        DataUtils
-            .sendMetricToElasticSearch(PROPERTIES_HOLDER.getElasticsearchIndexUrl(), metric);
-        //Exit loop if thread was interrupted
-        if (Thread.interrupted()) {
-          break;
-        }
-      }
-    }
   }
 
 }
