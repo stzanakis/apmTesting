@@ -1,14 +1,12 @@
 package com.tzan.apm;
 
 import com.tzan.apm.model.Metric;
+import com.tzan.apm.utils.PropertiesHolder;
 import com.tzan.apm.utils.DataUtils;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
@@ -22,12 +20,8 @@ public class Main {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
-//  public static final String APPLICATION_NAME = "metis-authentication-rest-test";
-  public static final List<String> applicationNames = new ArrayList<>(
-      Arrays.asList("metis-authentication-rest-test", "metis-core-rest-test"));
-  private static final String APP_NOZZLE_COMMAND_TEMPLATE = "cf app-nozzle %s -filter ContainerMetric";
   private static Map<String, Thread> runnablesMap = new HashMap<>();
-  private static final int SLEEP_TIME_PER_LOOP_IN_MINS = 1;
+  private static final PropertiesHolder PROPERTIES_HOLDER = new PropertiesHolder();
 
   public static void main(String[] arg) throws IOException, InterruptedException {
 
@@ -36,7 +30,7 @@ public class Main {
 
       //Read application names from file every minute
       //Check which ones are not running and start them
-      for (String applicationName : applicationNames) {
+      for (String applicationName : PropertiesHolder.applicationNames) {
         final Thread thread = runnablesMap.get(applicationName);
         if (thread == null || !thread.isAlive()) {
           final Thread runnableThread = createRunnableThread(applicationName);
@@ -48,8 +42,10 @@ public class Main {
         }
       }
 
-      LOGGER.info("Sleeping for {} before re-checking map of threads.", SLEEP_TIME_PER_LOOP_IN_MINS);
-      Thread.sleep(TimeUnit.MINUTES.toMillis(SLEEP_TIME_PER_LOOP_IN_MINS));
+      LOGGER
+          .info("Sleeping for {} before re-checking map of threads.",
+              PropertiesHolder.SLEEP_TIME_PER_LOOP_IN_MINS);
+      Thread.sleep(TimeUnit.MINUTES.toMillis(PropertiesHolder.SLEEP_TIME_PER_LOOP_IN_MINS));
     } while (true);
 
 //    final Metric metric = convertNozzleMetricsToMetricObject();
@@ -65,7 +61,8 @@ public class Main {
 
   private static Thread createRunnableThread(String applicationName) throws IOException {
     Runtime rt = Runtime.getRuntime();
-    final Process process = rt.exec(String.format(APP_NOZZLE_COMMAND_TEMPLATE, applicationName));
+    final Process process = rt
+        .exec(String.format(PropertiesHolder.APP_NOZZLE_COMMAND_TEMPLATE, applicationName));
     return new Thread(() -> {
       BufferedReader input = new BufferedReader(new InputStreamReader(process.getInputStream()));
       String line;
@@ -73,7 +70,7 @@ public class Main {
       try {
         while ((line = input.readLine()) != null) {
           final Metric metric = DataUtils.convertNozzleMetricsToMetricObject(applicationName, line);
-          DataUtils.sendMetricToElasticSearch(metric);
+          DataUtils.sendMetricToElasticSearch(PROPERTIES_HOLDER.getElasticsearchIndexUrl(), metric);
         }
       } catch (IOException e) {
         e.printStackTrace();

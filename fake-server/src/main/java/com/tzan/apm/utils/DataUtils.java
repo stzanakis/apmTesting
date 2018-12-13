@@ -19,15 +19,13 @@ public class DataUtils {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(DataUtils.class);
 
-  private static final String baseUrl = "";
-
-  public static void sendMetricToElasticSearch(Metric metric) {
+  public static void sendMetricToElasticSearch(String elasticsearchIndexUrl, Metric metric) {
     if (metric != null) {
       RestTemplate restTemplate = new RestTemplate();
       HttpHeaders headers = new HttpHeaders();
       headers.setContentType(MediaType.APPLICATION_JSON);
       HttpEntity<Metric> entity = new HttpEntity<>(metric, headers);
-      restTemplate.postForEntity(baseUrl, entity, Metric.class);
+      restTemplate.postForEntity(elasticsearchIndexUrl, entity, Metric.class);
       LOGGER.info("Posted to elasticsearch for applicationName: {}",
           metric.getMetadata().getApplicationName());
     }
