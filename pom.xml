@@ -10,6 +10,6 @@
   <packaging>pom</packaging>
 
   <modules>
-    <module>firehost-to-elasticsearch-daemon</module>
+    <module>firehose-to-elasticsearch-daemon</module>
   </modules>
 </project>
