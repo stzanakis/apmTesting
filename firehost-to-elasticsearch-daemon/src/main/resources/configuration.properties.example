@@ -8,4 +8,4 @@ cf.username=
 cf.password=
 cf.organization=
 cf.target.space=
-cf.log.interval.in.mins=
+cf.login.interval.in.mins=

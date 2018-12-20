@@ -58,7 +58,7 @@ public class PropertiesHolder {
     cfPassword = (String) properties.get("cf.password");
     cfOrganization = (String) properties.get("cf.organization");
     cfTargetSpace = (String) properties.get("cf.target.space");
-    cfLoginIntervalInMins = Long.parseLong((String) properties.get("cf.log.interval.in.mins"));
+    cfLoginIntervalInMins = Long.parseLong((String) properties.get("cf.login.interval.in.mins"));
   }
 
   public String getElasticsearchIndexUrl() {
