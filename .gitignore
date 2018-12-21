@@ -18,3 +18,6 @@
 
 # Truststores
 *.jks
+
+# Logs
+**/logs

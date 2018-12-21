@@ -1,5 +1,7 @@
 package com.tzan.apm.utils;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
@@ -32,7 +34,13 @@ public class PropertiesHolder {
   public PropertiesHolder() {
     InputStream input = null;
     try {
-      input = getClass().getClassLoader().getResourceAsStream(CONFIGURATION_FILE);
+      if (new File(CONFIGURATION_FILE).exists()) { //Used on standalone .jar mode
+        input = new FileInputStream(CONFIGURATION_FILE);
+        LOGGER.info("Using configuration from file path");
+      } else {
+        input = getClass().getClassLoader().getResourceAsStream(CONFIGURATION_FILE); //Used on IDE
+        LOGGER.info("Using configuration from class path resources directory");
+      }
       properties.load(input);
     } catch (IOException e) {
       LOGGER.error(String.format("Could not read the properties file %s", CONFIGURATION_FILE), e);
